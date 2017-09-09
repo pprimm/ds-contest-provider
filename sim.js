@@ -1,10 +1,9 @@
 //import createDeepstream from 'deepstream.io-client-js'
 const DS = require( 'deepstream.io-client-js' );
 const Stopwatch = require('timer-stopwatch');
+const dsCredentials = require('./dsCredentials');
 
-const DEEPSTREAM_URL = 'wss://013.deepstreamhub.com?apiKey=12821441-678c-487f-b33c-f2fdbe2da9da';
-
-const client = DS(DEEPSTREAM_URL);
+const client = DS(dsCredentials.url);
 
 //-----------------------------------------------------------------------------
 // systemRecord & zonesRecord represent the state of our device. For our simulator, we get our initial
@@ -17,6 +16,7 @@ let zonesRecord = null;
 // constants
 //-----------------------------------------------------------------------------
 const ZONE_BYPASS_EVENT = 'zones/toggleBypass'
+const ZONE_TOGGLE_STATUS_EVENT = 'zones/toggleStatus';
 const ARM_AWAY_EVENT = 'system/armAway';
 const ARM_STAY_EVENT = 'system/armStay';
 const DISARM_EVENT = 'system/disarm';
@@ -85,9 +85,9 @@ const toggleZ05 = () => {
 
 const initializeZoneData = record => {
   zoneRecord = record;
-  //let zoneData = record.get();
-  //console.info(`zoneData: ${JSON.stringify(zoneData)}`);
-  setInterval(toggleZ05,5000);
+  const zoneData = record.get();
+  console.info(`zoneData: ${JSON.stringify(zoneData)}`);
+  //setInterval(toggleZ05,5000);
 }
 
 // https://stackoverflow.com/questions/27078285/simple-throttle-in-js
@@ -170,11 +170,27 @@ const zonesChanged = data => {
 // Event responses
 //-----------------------------------------------------------------------------
 const zoneBypassReceived = ({id}) => {
-  //console.info(`zoneBypassReceived: ${JSON.stringify(data)}`)
+  console.info(`zoneBypassReceived: ${id}`)
   if (id) {
     const path = `${id}.bypass`;
     const bypass = zonesRecord.get(path);
     zonesRecord.set(path,!bypass);
+  }
+}
+
+const toggleZoneStatus = oldStatus => {
+  switch(oldStatus) {
+    case 'Ready': return 'Open'
+    case 'Open': return 'Trouble'
+    default: return 'Ready'
+  }
+}
+
+const zoneToggleStatusReceived = ({id}) => {
+  console.info(`zoneToggleStatusReceived: ${id}`)
+  if (id) {
+    const path = `${id}.status`;
+    zonesRecord.set(path,toggleZoneStatus(zonesRecord.get(path)));
   }
 }
 
@@ -211,7 +227,7 @@ const disarmReceived = (data) => {
 //-----------------------------------------------------------------------------
 // When we are logged in, we kick everything off
 //-----------------------------------------------------------------------------
-client.login( (success, data) => {
+client.login(dsCredentials.authParams, (success, data) => {
   if (success) {
     console.log('login success');
     systemRecord = client.record.getRecord('test/system');
@@ -222,6 +238,7 @@ client.login( (success, data) => {
     zonesRecord.subscribe(throttle(zonesChanged,1000));
 
     client.event.subscribe(ZONE_BYPASS_EVENT,zoneBypassReceived);
+    client.event.subscribe(ZONE_TOGGLE_STATUS_EVENT,zoneToggleStatusReceived);
     client.event.subscribe(ARM_AWAY_EVENT,armAwayReceived);
     client.event.subscribe(ARM_STAY_EVENT,armStayReceived);
     client.event.subscribe(DISARM_EVENT,disarmReceived);
