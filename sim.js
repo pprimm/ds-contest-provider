@@ -5,13 +5,30 @@ const dsCredentials = require('./dsCredentials');
 
 const client = DS(dsCredentials.url);
 
+client.on('connectionStateChanged',state => {
+  console.info(`Conection State: ${state}`);
+});
+
+client.on('error', (error, event, topic) => {
+  console.info('Error -----------------------');
+  console.info(error);
+  console.info('Event -----------------------');
+  console.info(event);
+  console.info('Topic -----------------------');
+  console.info(topic);
+  if (event === 'connectionError' && connectionActive) {
+    process.exit();
+  }
+});
+
 //-----------------------------------------------------------------------------
 // systemRecord & zonesRecord represent the state of our device. For our simulator, we get our initial
 // state from deepstreamhub.  However, normaly we would get our initial state from the device.
 //-----------------------------------------------------------------------------
 let systemRecord = null;
 let zonesRecord = null;
-
+let eventsSubscribed = false;
+let connectionActive = false;
 //-----------------------------------------------------------------------------
 // constants
 //-----------------------------------------------------------------------------
@@ -43,7 +60,7 @@ const getNewDisplay = (state,ready) => {
 }
 
 //-----------------------------------------------------------------------------
-// armAwayTimer stuff
+// armAwayTimf stuff
 //-----------------------------------------------------------------------------
 let armAwayTimer = new Stopwatch(ARM_AWAY_DELAY_START_TIME,{refreshRateMS: 250});
 let lastAwayTime = 0;
@@ -67,6 +84,7 @@ armAwayTimer
    
 const initializeSystemData = record => {
   systemRecord = record;
+  console.info('systemRecord initialized')
   //let systemData = record.get();
   //console.info(`systemData: ${JSON.stringify(systemData)}`);
   //record.set('status.ready',false);
@@ -84,9 +102,10 @@ const toggleZ05 = () => {
 }
 
 const initializeZoneData = record => {
+  console.info('zoneRecord initialized')
   zoneRecord = record;
   const zoneData = record.get();
-  console.info(`zoneData: ${JSON.stringify(zoneData)}`);
+  //console.info(`zoneData: ${JSON.stringify(zoneData)}`);
   //setInterval(toggleZ05,5000);
 }
 
@@ -229,19 +248,27 @@ const disarmReceived = (data) => {
 //-----------------------------------------------------------------------------
 client.login(dsCredentials.authParams, (success, data) => {
   if (success) {
+    connectionActive = true;
     console.log('login success');
-    systemRecord = client.record.getRecord('test/system');
-    systemRecord.whenReady(initializeSystemData);
+    if (systemRecord === null) {
+      systemRecord = client.record.getRecord('test/system');
+      systemRecord.whenReady(initializeSystemData);
+    }
 
-    zonesRecord = client.record.getRecord('test/zones');
-    zonesRecord.whenReady(initializeZoneData);
-    zonesRecord.subscribe(throttle(zonesChanged,1000));
+    if (zonesRecord === null) {
+      zonesRecord = client.record.getRecord('test/zones');
+      zonesRecord.whenReady(initializeZoneData);
+      zonesRecord.subscribe(throttle(zonesChanged,1000));
+    }
 
-    client.event.subscribe(ZONE_BYPASS_EVENT,zoneBypassReceived);
-    client.event.subscribe(ZONE_TOGGLE_STATUS_EVENT,zoneToggleStatusReceived);
-    client.event.subscribe(ARM_AWAY_EVENT,armAwayReceived);
-    client.event.subscribe(ARM_STAY_EVENT,armStayReceived);
-    client.event.subscribe(DISARM_EVENT,disarmReceived);
+    if (eventsSubscribed === false) {
+      eventsSubscribed = true;
+      client.event.subscribe(ZONE_BYPASS_EVENT,zoneBypassReceived);
+      client.event.subscribe(ZONE_TOGGLE_STATUS_EVENT,zoneToggleStatusReceived);
+      client.event.subscribe(ARM_AWAY_EVENT,armAwayReceived);
+      client.event.subscribe(ARM_STAY_EVENT,armStayReceived);
+      client.event.subscribe(DISARM_EVENT,disarmReceived);
+    }
   }
 });
 
