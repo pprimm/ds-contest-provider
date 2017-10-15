@@ -69,14 +69,14 @@ const getNewDisplay = (state,ready) => {
   return ([state, '']);
 }
 
-const updateLightTower = (sysState, isReady) => {
+const updateLightTower = (sysState, isReady = true, isTrouble = false) => {
   switch (sysState) {
     case OFFLINE:
     case DISARMED:
     case ARM_DELAY:
     setDigitalOut(GREEN_LIGHT_CHAN, isReady ? DIG_OUTPUT_ON : DIG_OUTPUT_OFF);
       setDigitalOut(YELLOW_LIGHT_CHAN, isReady ? DIG_OUTPUT_OFF : DIG_OUTPUT_ON);
-      setDigitalOut(RED_LIGHT_CHAN, DIG_OUTPUT_OFF);
+      setDigitalOut(RED_LIGHT_CHAN, isTrouble ? DIG_OUTPUT_ON : DIG_OUTPUT_OFF);
       setDigitalOut(BUZZER_CHAN, DIG_OUTPUT_OFF);
       break;
     case ARM_STAY:
@@ -107,14 +107,14 @@ armAwayTimer
       setDigitalOut(BUZZER_CHAN, DIG_OUTPUT_ON);
       lastAwayTime = newAwayTime;
       if (systemRecord) {
-        systemRecord.set('display.1',lastAwayTime);
+        systemRecord.set('display.1',lastAwayTime + 1);
       }
     } else if (newAwayTime !== beepAwayTime) {
       setDigitalOut(BUZZER_CHAN, DIG_OUTPUT_OFF);
     }
   })
   .onDone(() => {
-    updateLightTower(ARM_AWAY,true);
+    updateLightTower(ARM_AWAY);
     if (systemRecord) {
       //console.info(getNewDisplay(ARM_AWAY,true));
       systemRecord.set('status.state',ARM_AWAY);
@@ -195,6 +195,7 @@ const zonesChanged = data => {
   let bypassCount = 0;
   let openCount = 0;
   let troubleCount = 0;
+  let trouble = false;
   const ids = Object.keys(data);
   ids.map(id => {
     //console.info(data[id])
@@ -209,6 +210,7 @@ const zonesChanged = data => {
         break;
       case 'Trouble':
         troubleCount++;
+        trouble = trouble || !zone.bypass;
         ready = ready && zone.bypass;
         break;
       default: break;
@@ -243,7 +245,7 @@ const zonesChanged = data => {
     default:
       break;
   }
-  updateLightTower(state,ready);
+  updateLightTower(state, ready, trouble);
 }
 
 //-----------------------------------------------------------------------------
