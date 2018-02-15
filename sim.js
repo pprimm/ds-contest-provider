@@ -60,7 +60,7 @@ const getNewDisplay = (state,ready) => {
 }
 
 //-----------------------------------------------------------------------------
-// armAwayTimf stuff
+// armAwayTimer stuff
 //-----------------------------------------------------------------------------
 let armAwayTimer = new Stopwatch(ARM_AWAY_DELAY_START_TIME,{refreshRateMS: 250});
 let lastAwayTime = 0;

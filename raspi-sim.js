@@ -508,7 +508,7 @@ raspi.init(() => {
       }
     });
 
-    // read digital outputs
+    // write digital outputs
     digOutputs.map((output) => {
       output.output.write(output.value);
     });
